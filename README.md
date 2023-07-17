@@ -162,6 +162,9 @@ This means the structure created may not ressemble others of the same format.
 This can also cause a problem if you are checking identity of produced SIR0 against original
 as you can't byte compare both files to check identity between files.
 
+The resulting SIR0 can also increase in size as padding bytes are added to ensure
+all structures are 4-bytes aligned.
+
 However, both files should be fundamentally equivalent.
 
 ### Taking back 'Universal'
