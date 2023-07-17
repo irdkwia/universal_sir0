@@ -52,6 +52,7 @@ Usage: python3 sir0.py <options> in_data out_data
 
 Options:
  -a Ascii representation in comments (only for Deconstruct mode)
+ -b Big endian mode (only for Deconstruct mode)
  -d Deconstruct
  -v Verbose
  ```
@@ -59,7 +60,14 @@ By default, the tool parses the xml file in `in_data` to produce a SIR0 file at 
 
 Use `-d` to parse a SIR0 file in `in_data` and produce the xml representation at `out_data`.
 
-You can also use `-a` in this mode to add in xml comments the ascii representation of each data block,
+By default, offsets are treated as little endian. If offsets in file are big endian, use the `-b` option.
+
+NB: 
+- If you get an `Out of range` error when trying to Deconstruct, this is most likely and endianness
+  problem, so try with the `-b` option instead.
+- Construct mode does not need the `-b` option as it is included in the xml specification.
+
+You can also use `-a` in Deconstruct mode to add in xml comments the ascii representation of each data block,
 which can be useful to search for strings (non representable characters are marked with '?').
 
 ## XML Representation
@@ -80,6 +88,9 @@ Order of elements nested in `<struct>` is important: each element will be assemb
 create the resulting structure.
 
 Additionally, `<struct>` will always be the root element, as the SIR0 header starts with a pointer to a structure.
+
+Root element can have two optional attributes: `endianness` (defaults to `little`) and `mode` (defaults to `4`), 
+which respectively define endianness and size in bytes of offsets.
 
 ### Examples
 
