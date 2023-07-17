@@ -1,11 +1,10 @@
 import sys
 import binascii
+from xml.dom import minidom
 import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import ElementTree, Element, Comment
 
 def deconstruct_sir0(sir0_data, endianness="little", ascii_comment=False, verbose=False):
-    global struct_id, mode
-    struct_id = 0
-    file_xml = []
     if sir0_data[0:4]!=b"SIR0":
         raise Exception("Not SIR0 data!")
     header_start = int.from_bytes(sir0_data[4:8], endianness)
@@ -21,42 +20,44 @@ def deconstruct_sir0(sir0_data, endianness="little", ascii_comment=False, verbos
     multi_pointed_addr = []
     map_addr_id = dict()
     
-    def handle_data(data, level):
+    def handle_data(data, element):
         if len(data)>0:
             if verbose:
-                print("\t"*level+("Data block size %d"%len(data)))
-            file_xml.append("\t"*level+"<data>"+binascii.hexlify(data).decode("ascii")+"</data>")
+                print("Data block size %d"%len(data))
+            delt = Element("data")
+            delt.text = binascii.hexlify(data).decode("ascii")
+            element.append(delt)
             if ascii_comment:
-                file_xml.append("\t"*level+"<!-- "+"".join(chr(b) if 0x20<=b<0x7F else "?" for b in data)+" -->")
+                element.append(Comment(" "+("".join(chr(b) if 0x20<=b<0x7F else "?" for b in data))+" "))
 
-    def read_ptr_struct(start, level=0, root=False):
-        global struct_id, mode
-        if verbose:
-            print("\t"*level+(("Struct at 0x%0"+str(mode*2)+"X")%start))
-        if start in map_addr_id:
-            file_xml.append("\t"*level+"<reference ref='"+map_addr_id[start]+"' />")
-            return
-        if start in multi_pointed_addr:
-            tag = "\t"*level+"<struct id='"+str(struct_id)+"'"
-            map_addr_id[start] = str(struct_id)
-            struct_id += 1
-        else:
-            tag = "\t"*level+"<struct"
-        if root:
-            tag += " endianness='"+endianness+"' mode='"+str(mode)+"'"
-        
-        file_xml.append(tag+">")
-        end = pointed_addr[pointed_addr.index(start)+1]
-        data_to_handle = b''
-        for i in range(start, end, mode):
-            if i in ptrlist:
-                handle_data(data_to_handle, level+1)
-                data_to_handle = b''
-                read_ptr_struct(int.from_bytes(sir0_data[i:i+mode], endianness), level+1)
-            else:
-                data_to_handle += sir0_data[i:min(i+mode, end)]
-        handle_data(data_to_handle, level+1)
-        file_xml.append("\t"*level+"</struct>")
+    def read_ptr_struct(header_start, root, mode):
+        struct_id = 0
+        to_complete = [(header_start, root)]
+        while len(to_complete)>0:
+            start, element = to_complete[0]
+            del to_complete[0]
+            if verbose:
+                print((("Struct at 0x%0"+str(mode*2)+"X")%start))
+            if start in map_addr_id:
+                element.tag = "reference"
+                element.attrib["ref"] = map_addr_id[start]
+                continue
+            if start in multi_pointed_addr:
+                element.attrib["id"] = str(struct_id)
+                map_addr_id[start] = str(struct_id)
+                struct_id += 1
+            end = pointed_addr[pointed_addr.index(start)+1]
+            data_to_handle = b''
+            for i in range(start, end, mode):
+                if i in ptrlist:
+                    handle_data(data_to_handle, element)
+                    data_to_handle = b''
+                    sub = Element("struct")
+                    element.append(sub)
+                    to_complete.append((int.from_bytes(sir0_data[i:i+mode], endianness), sub))
+                else:
+                    data_to_handle += sir0_data[i:min(i+mode, end)]
+            handle_data(data_to_handle, element)
     
     if verbose:
         print("Reading pointer list...")
@@ -82,8 +83,9 @@ def deconstruct_sir0(sir0_data, endianness="little", ascii_comment=False, verbos
     pointed_addr.sort()
     if verbose:
         print("Reading data structures...")
-    read_ptr_struct(header_start, root=True)
-    return "\n".join(file_xml)
+    root = Element("struct", {"endianness": endianness, "mode": str(mode)})
+    read_ptr_struct(header_start, root, mode)
+    return minidom.parseString(ET.tostring(root)).toprettyxml(indent="\t")
 
 def construct_sir0(file_xml, verbose=False):
     global sir0_data, mode, endianness
