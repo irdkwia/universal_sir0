@@ -58,6 +58,7 @@ Options:
 By default, the tool parses the xml file in `in_data` to produce a SIR0 file at `out_data`.
 
 Use `-d` to parse a SIR0 file in `in_data` and produce the xml representation at `out_data`.
+
 You can also use `-a` in this mode to add in xml comments the ascii representation of each data block,
 which can be useful to search for strings (non representable characters are marked with '?').
 
@@ -69,6 +70,7 @@ XML Representation of SIR0 with this specification is straightforward. 3 types o
 - `<struct>` elements are pointers to another structure, referenced by a 4 bytes pointer in the SIR0 file.
   The represented structure can contain any of the elements defined, including nested `<struct>`
 - `<data>` elements contain raw data, stored in hexadecimal string representation
+
 These two elements could technically cover all SIR0 files, but at the cost of redundancy, as some structures
 may be referenced multiple times. To support a more accurate representation, a third element is introduced: 
 - `<reference ref='X'>` is a reference to another `<struct>` element present somewhere in the xml tree.
@@ -76,18 +78,19 @@ may be referenced multiple times. To support a more accurate representation, a t
 
 Order of elements nested in `<struct>` is important: each element will be assembled from top to bottom to
 create the resulting structure.
+
 Additionally, `<struct>` will always be the root element, as the SIR0 header starts with a pointer to a structure.
 
 ### Examples
 
 A simple hello world message
-```
+```XML
 <struct>
     <data>48656c6c6f20576f726c642100</data>
 </struct>
 ```
 Note that consecutive `<data>` elements are equivalent to a single one containing the concatenation of both: 
-```
+```XML
 <struct>
     <struct>
         <data>48656c6c6f20576f726c642100</data>
@@ -95,7 +98,7 @@ Note that consecutive `<data>` elements are equivalent to a single one containin
 </struct>
 ```
 is equivalent to
-```
+```XML
 <struct>
     <struct>
         <data>48656c6c6f20</data>
@@ -104,7 +107,7 @@ is equivalent to
 </struct>
 ```
 BUT NOT
-```
+```XML
 <struct>
     <struct>
         <data>48656c6c6f20</data>
@@ -117,7 +120,7 @@ BUT NOT
 as the latter creates two different structures that could be moved anywhere in the final SIR0 file.
 
 Nested structures
-```
+```XML
 <struct>
     <data>00000000</data>
     <struct>
@@ -136,12 +139,12 @@ Nested structures
 </struct>
 ```
 References
-```
+```XML
 <struct>
     <struct id='HELLO'>
         <data>48656c6c6f20576f726c642100</data>
     </struct>
-    <reference ref='HELLO'>
+    <reference ref='HELLO'/>
 </struct>
 ```
 This creates a single nested structure containing 'Hello World!', which is referenced twice
@@ -180,6 +183,7 @@ so it may not be that important.
 
 Currently, the biggest extension that could be done is
 to improve readability of `<data>` sections.
+
 One way of making it more readable is to support
 providing (partial) definition of the target SIR0 structure
 and/or add customizable `<data>` section handlers.
