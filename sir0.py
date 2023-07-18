@@ -28,7 +28,7 @@ def deconstruct_sir0(sir0_data, endianness="little", ascii_comment=False, verbos
             delt.text = binascii.hexlify(data).decode("ascii")
             element.append(delt)
             if ascii_comment:
-                element.append(Comment(" "+("".join(chr(b) if 0x20<=b<0x7F else "?" for b in data))+" "))
+                element.append(Comment(" "+("".join(chr(b) if 0x20<=b<0x2D or 0x2E<=b<0x7F else "?" for b in data))+" "))
 
     def read_ptr_struct(header_start, root, mode):
         struct_id = 0
@@ -85,7 +85,8 @@ def deconstruct_sir0(sir0_data, endianness="little", ascii_comment=False, verbos
         print("Reading data structures...")
     root = Element("struct", {"endianness": endianness, "mode": str(mode)})
     read_ptr_struct(header_start, root, mode)
-    return minidom.parseString(ET.tostring(root)).toprettyxml(indent="\t")
+    out = ET.tostring(root)
+    return minidom.parseString(out).toprettyxml(indent="\t")
 
 def construct_sir0(file_xml, verbose=False):
     global sir0_data, mode, endianness
