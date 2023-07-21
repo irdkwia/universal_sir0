@@ -214,11 +214,11 @@ Root
 - int16
 - uint8[2]
 
-InnerStruct:
+InnerStruct
 - *str16
 - PlusMinus[]
 
-PlusMinus:
+PlusMinus
 - uint
 - int
 ```
@@ -233,11 +233,11 @@ Root
 - int16
 - uint8[2]
 
-InnerStruct:
+InnerStruct
 - *str16
 - *PlusMinus[]
 
-PlusMinus:
+PlusMinus
 - uint
 - int
 ```
