@@ -191,7 +191,7 @@ All types in typing extension are accepted, plus some special types:
   Note: you can't use padding if there is still an pointer defined in the structure
 - `skip`: skips a byte. You can use it to skip unknown pointers, provided you skip the right amount
   of bytes for a pointer. Skipped data will be rendered as default
-- `void` is also reversed for future usage
+- `void` is also reserved for future usage
 
 You can also define your own types, declaring them on a line then using a bullet list to list
 their fields in order.
