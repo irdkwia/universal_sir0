@@ -48,7 +48,7 @@ This needs python3 to be installed, no other dependencies are required.
 To use this in command line: 
 
 ```
-Usage: python3 sir0.py <options> in_data out_data
+Usage: python3 sir0.py <options> in_data out_data [struct_data]
 
 Options:
  -a Ascii representation in comments (only for Deconstruct mode)
@@ -161,6 +161,89 @@ References
 This creates a single nested structure containing 'Hello World!', which is referenced twice
 in the header structure. Both will be converted as pointing the same offset in the result SIR0.
 
+## Extension: Typing
+
+### XML Specification
+
+XML representation now support typing! `<data>` elements now support a `type` attribute,
+which can be one of these: 
+- `raw` (default): raw data, stored in hexadecimal string representation
+- `uint`: unsigned integer, represented on the same number of bytes as offsets (declared with `mode` attribute); 
+  `uint8`, `uint16`, `uint32`, `uint64` exist for a fixed amount of bytes (resp. 1, 2, 4, and 8)
+- `int`: signed integer, represented on the same number of bytes as offsets (declared with `mode` attribute); 
+  `int8`, `int16`, `int32`, `int64` exist for a fixed amount of bytes (resp. 1, 2, 4, and 8)
+- `str8`: 8-bit characters string representation
+- `str16`: 16-bit characters string representation
+- `sir0`: a nested SIR0 file!
+
+## Extension: Structure files
+
+### File Specification
+
+Tool now support creating structure files to help deconstruct the SIR0!
+
+The argument `struct_data` can be passed at deconstruction to (partially) provide a specification.
+
+Examples can be found inside the `struct` directory.
+
+All types in typing extension are accepted, plus some special types:
+- `padding`: marks the remaining bytes, until the end of the structure as padding and ignores them
+  Note: you can't use padding if there is still an pointer defined in the structure
+- `skip`: skips a byte. You can use it to skip unknown pointers, provided you skip the right amount
+  of bytes for a pointer. Skipped data will be rendered as default
+- `void` is also reversed for future usage
+
+You can also define your own types, declaring them on a line then using a bullet list to list
+their fields in order.
+
+Adding a `*` before the type means that the field is a pointer to a type. Pointers are required
+for structure pointers
+
+Adding a `[#]` will repeat the field # times. 
+Specifying # as 0 (or leaving it blank `[]`) treats it as an infinite number;
+this means that type will be repeated until you reach the end of the structure.
+
+Note that construction does not need any file, as typing is included within the XML representation.
+
+### Examples
+
+```YAML
+Root 
+- uint
+- *InnerStruct
+- int16
+- uint8[2]
+
+InnerStruct:
+- *str16
+- PlusMinus[]
+
+PlusMinus:
+- uint
+- int
+```
+This file defines a SIR0 starting with a `uint` attribute, then a pointer to a `InnerStruct` structure, then a `int16` and two `uint8`.
+Then, the `InnerStruct` structure is composed of a pointer to a 16-bit string, then an undefined number of `PlusMinus` structures,
+alternates unsigned and signed integers.
+
+```YAML
+Root 
+- uint
+- *InnerStruct
+- int16
+- uint8[2]
+
+InnerStruct:
+- *str16
+- *PlusMinus[]
+
+PlusMinus:
+- uint
+- int
+```
+Note that this is a bit different: here `*PlusMinus[]` is now an undefined number of __pointer__ to `PlusMinus` structures, while
+in the first example, they were integrated to the `InnerStruct`
+
 ## Drawbacks
 
 ### Result SIR0 file size and structure
@@ -174,7 +257,7 @@ This can also cause a problem if you are checking identity of produced SIR0 agai
 as you can't byte compare both files to check identity between files.
 
 The resulting SIR0 can also increase in size as padding bytes are added to ensure
-all structures are 4-bytes aligned.
+all structures are n-bytes aligned (where n is the mode defined).
 
 However, both files should be fundamentally equivalent.
 
