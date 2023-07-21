@@ -92,6 +92,21 @@ def fstr16(d, element, chunk):
             element.text += "\\x%04X"%v
     return b''
 
+def fsir0(d, element, chunk):
+    list_slash = element.attrib["type"].split("/")
+    element.attrib["type"] = list_slash[0]
+    if len(list_slash)==2:
+        yml_data = d.yml_data
+        start_type = list_slash[1]
+    else:
+        yml_data = None
+        start_type = None
+    print(list_slash, start_type)
+    xml = d.__class__(chunk, yml_data=yml_data, endianness=d.endianness, prefix=str(d.nb_prefix)+"_"+d.prefix, start_type=start_type, ascii_comment=d.ascii_comment, verbose=d.verbose).deconstruct()
+    d.nb_prefix += 1
+    element.append(xml)
+    return b''
+
 DECONSTRUCT_HANDLERS = {
     "skip": (True, fraw),
     "raw": (True, fraw),
@@ -107,6 +122,7 @@ DECONSTRUCT_HANDLERS = {
     "int64": (False, partial(fint, size=8)),
     "str8": (False, fstr8),
     "str16": (False, fstr16),
+    "sir0": (False, fsir0),
     "padding": (False, lambda: b''),
 }
 
@@ -117,11 +133,11 @@ CONSTRUCT_HANDLERS = {
     "uint16": lambda c, element: int(element.text).to_bytes(2, c.endianness),
     "uint32": lambda c, element: int(element.text).to_bytes(4, c.endianness),
     "uint64": lambda c, element: int(element.text).to_bytes(8, c.endianness),
-    "int": lambda c, element: int(element.text).to_bytes(c.mode, c.endianness),
-    "int8": lambda c, element: int(element.text).to_bytes(1, c.endianness),
-    "int16": lambda c, element: int(element.text).to_bytes(2, c.endianness),
-    "int32": lambda c, element: int(element.text).to_bytes(4, c.endianness),
-    "int64": lambda c, element: int(element.text).to_bytes(8, c.endianness),
+    "int": lambda c, element: int(element.text).to_bytes(c.mode, c.endianness, signed=True),
+    "int8": lambda c, element: int(element.text).to_bytes(1, c.endianness, signed=True),
+    "int16": lambda c, element: int(element.text).to_bytes(2, c.endianness, signed=True),
+    "int32": lambda c, element: int(element.text).to_bytes(4, c.endianness, signed=True),
+    "int64": lambda c, element: int(element.text).to_bytes(8, c.endianness, signed=True),
     "str8": encode_utf8,
     "str16": encode_utf16,
     "sir0": lambda c, element: c.__class__(element[0], c.verbose).construct(),
@@ -149,7 +165,7 @@ class SIR0Cursor:
             if self.stack[-1][2]==next_elt[1]:
                 self.stack[-1][2] = 0
                 self.stack[-1][1] += 1
-            if next_elt[0].startswith("*") or next_elt[0] in DECONSTRUCT_HANDLERS:
+            if next_elt[0].startswith("*") or next_elt[0].split("/")[0] in DECONSTRUCT_HANDLERS:
                 confirmed_elt = next_elt[0]
             else:
                 self.stack.append([self.struct_data[next_elt[0]],0,0])
@@ -159,11 +175,12 @@ class SIR0Cursor:
         
 
 class SIR0Deconstructor:
-    def __init__(self, sir0_data, endianness='little', yml_data=None, prefix="", ascii_comment=False, verbose=False):
+    def __init__(self, sir0_data, endianness='little', yml_data=None, prefix="", start_type="Root", ascii_comment=False, verbose=False):
         self.sir0_data = sir0_data
         self.yml_data = yml_data
         self.endianness = endianness
-        self.prefix = ""
+        self.prefix = prefix
+        self.start_type = start_type
         self.ascii_comment = ascii_comment
         self.verbose = verbose
 
@@ -184,7 +201,15 @@ class SIR0Deconstructor:
             last_data = None
             chunk = data
             while len(chunk)>0:
-                typenext = cursor.get_next_element()
+                typenextall = cursor.get_next_element(move=False)
+                typenext = cursor.get_next_element().split("/")[0]
+                if typenext.startswith("*"):
+                    delt = Element("data")
+                    delt.text = ""
+                    delt.attrib["type"] = "uint"
+                    chunk = fuint(self, delt, chunk)
+                    element.append(delt)
+                    continue
                 if typenext=="padding":
                     break
                 if last_data!=typenext or not DECONSTRUCT_HANDLERS[typenext][0]:
@@ -192,7 +217,7 @@ class SIR0Deconstructor:
                     delt = Element("data")
                     delt.text = ""
                     if typenext not in ["raw", "skip"]:
-                        delt.attrib["type"] = typenext 
+                        delt.attrib["type"] = typenextall
                     element.append(delt)
                 chunk = DECONSTRUCT_HANDLERS[typenext][1](self, delt, chunk)
             if self.ascii_comment:
@@ -279,7 +304,6 @@ class SIR0Deconstructor:
                     self.struct_data[current] = []
         else:
             self.struct_data = None
-        print(self.struct_data)
         if self.verbose:
             print("Reading pointer list...")
         off_start = 0
@@ -305,7 +329,7 @@ class SIR0Deconstructor:
         if verbose:
             print("Reading data structures...")
         root = Element("struct", {"endianness": self.endianness, "mode": str(self.mode)})
-        self.read_ptr_struct(header_start, root, "Root" if self.struct_data else None)
+        self.read_ptr_struct(header_start, root, self.start_type if self.struct_data else None)
         return root
 
 class SIR0Constructor:

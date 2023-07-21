@@ -1,0 +1,27 @@
+Root
+- skip[4]
+- *sir0/Pkmn
+- *sir0/Trap
+- uint
+
+Pkmn
+- uint
+- *PkmnDef[]
+
+PkmnDef
+- PkmnEntry[]
+
+PkmnEntry
+- int16
+- int8[2]
+
+Trap
+- uint
+- *TrapDef[]
+
+TrapDef
+- TrapEntry[]
+
+TrapEntry
+- int16
+- int8[2]
