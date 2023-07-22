@@ -12,7 +12,7 @@ PkmnDef
 - PkmnEntry[]
 
 PkmnEntry
-- int16
+- uint16/9,7
 - int8[2]
 
 Trap

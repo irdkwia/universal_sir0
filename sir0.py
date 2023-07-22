@@ -7,6 +7,28 @@ from xml.sax.saxutils import escape
 
 from functools import partial
 
+def get_mask(bits):
+    mask = 0
+    for i in range(bits):
+        mask |= 1<<i
+    return mask
+
+def encode_int(c, element, size=0, signed=False):
+    if size==0:
+        size = c.mode
+    typeint = element.attrib["type"].split("/")
+    if len(typeint)==1:
+        return int(element.text).to_bytes(size, c.endianness, signed=signed)
+    else:
+        list_bit = [int(x.strip()) for x in typeint[1].split(",")]
+        list_data = [int(x.strip()) for x in element.text.split(",")]
+        s = 0
+        b = 0
+        for i in range(len(list_bit)):
+            s |= (list_data[i] & get_mask(list_bit[i])) << b
+            b += list_bit[i]
+        return s.to_bytes(size, c.endianness, signed=signed)
+    
 def encode_utf8(_, element):
     i = 0
     encoded = b''
@@ -50,16 +72,21 @@ def fraw(_, element, chunk):
     element.text += binascii.hexlify(bytes([chunk[0]])).decode("ascii")
     return chunk[1:]
 
-def fuint(d, element, chunk, size=0):
+def fint(d, element, chunk, size=0, signed=False):
     if size==0:
         size = d.mode
-    element.text = str(int.from_bytes(chunk[:size], d.endianness))
-    return chunk[size:]
-
-def fint(d, element, chunk, size=0):
-    if size==0:
-        size = d.mode
-    element.text = str(int.from_bytes(chunk[:size], d.endianness, signed=True))
+    typeint = element.attrib["type"].split("/")
+    v = int.from_bytes(chunk[:size], d.endianness, signed=signed)
+    if len(typeint)==1:
+        element.text = str(v)
+    else:
+        list_bit = [int(x.strip()) for x in typeint[1].split(",")]
+        s = []
+        b = 0
+        for i in range(len(list_bit)):
+            s.append(str((v >> b) & get_mask(list_bit[i])))
+            b += list_bit[i]
+        element.text = ",".join(s)
     return chunk[size:]
 
 def fstr8(_, element, chunk):
@@ -101,7 +128,6 @@ def fsir0(d, element, chunk):
     else:
         yml_data = None
         start_type = None
-    print(list_slash, start_type)
     xml = d.__class__(chunk, yml_data=yml_data, endianness=d.endianness, prefix=str(d.nb_prefix)+"_"+d.prefix, start_type=start_type, ascii_comment=d.ascii_comment, verbose=d.verbose).deconstruct()
     d.nb_prefix += 1
     element.append(xml)
@@ -110,16 +136,16 @@ def fsir0(d, element, chunk):
 DECONSTRUCT_HANDLERS = {
     "skip": (True, fraw),
     "raw": (True, fraw),
-    "uint": (False, fuint),
-    "uint8": (False, partial(fuint, size=1)),
-    "uint16": (False, partial(fuint, size=2)),
-    "uint32": (False, partial(fuint, size=4)),
-    "uint64": (False, partial(fuint, size=8)),
-    "int": (False, fint),
-    "int8": (False, partial(fint, size=1)),
-    "int16": (False, partial(fint, size=2)),
-    "int32": (False, partial(fint, size=4)),
-    "int64": (False, partial(fint, size=8)),
+    "uint": (False, fint),
+    "uint8": (False, partial(fint, size=1)),
+    "uint16": (False, partial(fint, size=2)),
+    "uint32": (False, partial(fint, size=4)),
+    "uint64": (False, partial(fint, size=8)),
+    "int": (False, partial(fint, signed=True)),
+    "int8": (False, partial(fint, size=1, signed=True)),
+    "int16": (False, partial(fint, size=2, signed=True)),
+    "int32": (False, partial(fint, size=4, signed=True)),
+    "int64": (False, partial(fint, size=8, signed=True)),
     "str8": (False, fstr8),
     "str16": (False, fstr16),
     "sir0": (False, fsir0),
@@ -128,16 +154,16 @@ DECONSTRUCT_HANDLERS = {
 
 CONSTRUCT_HANDLERS = {
     "raw": lambda _, element: binascii.unhexlify(element.text),
-    "uint": lambda c, element: int(element.text).to_bytes(c.mode, c.endianness),
-    "uint8": lambda c, element: int(element.text).to_bytes(1, c.endianness),
-    "uint16": lambda c, element: int(element.text).to_bytes(2, c.endianness),
-    "uint32": lambda c, element: int(element.text).to_bytes(4, c.endianness),
-    "uint64": lambda c, element: int(element.text).to_bytes(8, c.endianness),
-    "int": lambda c, element: int(element.text).to_bytes(c.mode, c.endianness, signed=True),
-    "int8": lambda c, element: int(element.text).to_bytes(1, c.endianness, signed=True),
-    "int16": lambda c, element: int(element.text).to_bytes(2, c.endianness, signed=True),
-    "int32": lambda c, element: int(element.text).to_bytes(4, c.endianness, signed=True),
-    "int64": lambda c, element: int(element.text).to_bytes(8, c.endianness, signed=True),
+    "uint": encode_int,
+    "uint8": partial(encode_int, size=1),
+    "uint16": partial(encode_int, size=2),
+    "uint32": partial(encode_int, size=4),
+    "uint64": partial(encode_int, size=8),
+    "int": partial(encode_int, signed=True),
+    "int8": partial(encode_int, size=1, signed=True),
+    "int16": partial(encode_int, size=2, signed=True),
+    "int32": partial(encode_int, size=4, signed=True),
+    "int64": partial(encode_int, size=8, signed=True),
     "str8": encode_utf8,
     "str16": encode_utf16,
     "sir0": lambda c, element: c.__class__(element[0], c.verbose).construct(),
@@ -150,7 +176,7 @@ class SIR0Cursor:
         self.stack = [[((typeelt,1),),0,0]]
         self.last_elt = None
 
-    def get_next_element(self, move=True):
+    def get_next_element(self, move=True, element=None):
         if self.last_elt:
             last_elt = self.last_elt
             if move:
@@ -168,6 +194,8 @@ class SIR0Cursor:
             if next_elt[0].startswith("*") or next_elt[0].split("/")[0] in DECONSTRUCT_HANDLERS:
                 confirmed_elt = next_elt[0]
             else:
+                if element is not None:
+                    element.append(Element("sep", {"type": next_elt[0]}))
                 self.stack.append([self.struct_data[next_elt[0]],0,0])
         if not move:
             self.last_elt = confirmed_elt
@@ -201,13 +229,13 @@ class SIR0Deconstructor:
             last_data = None
             chunk = data
             while len(chunk)>0:
-                typenextall = cursor.get_next_element(move=False)
+                typenextall = cursor.get_next_element(move=False, element=element)
                 typenext = cursor.get_next_element().split("/")[0]
                 if typenext.startswith("*"):
                     delt = Element("data")
                     delt.text = ""
                     delt.attrib["type"] = "uint"
-                    chunk = fuint(self, delt, chunk)
+                    chunk = fint(self, delt, chunk)
                     element.append(delt)
                     continue
                 if typenext=="padding":
@@ -249,9 +277,9 @@ class SIR0Deconstructor:
                 if i in self.ptrlist:
                     self.handle_data(data_to_handle, element, cursor)
                     data_to_handle = b''
+                    typenext = cursor.get_next_element(element=element)
                     sub = Element("struct")
                     element.append(sub)
-                    typenext = cursor.get_next_element()
                     if typenext.startswith("*"):
                        typenext = typenext[1:]
                     elif typenext=="skip":
@@ -346,7 +374,7 @@ class SIR0Constructor:
         self.endianness = 'little'
 
     def handle_data(self, element):
-        etype = element.attrib.get("type", "raw")
+        etype = element.attrib.get("type", "raw").split("/")[0]
         return CONSTRUCT_HANDLERS[etype](self, element)
         
     def write_ptr_struct(self, element):

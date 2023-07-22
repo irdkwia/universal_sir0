@@ -1,0 +1,53 @@
+Root
+- *Unk16
+- *Unk8
+- *EventSpec
+- *WeightSpec
+- *NSpec1
+- *NSpec2
+- *NSpec3
+- *ItemSpec
+- *Unk16
+- padding
+
+Unk16
+- uint16[]
+
+Unk8
+- uint8[]
+
+EventSpec
+- uint16
+- EventEntry[]
+
+EventEntry
+- uint16[4]
+
+WeightSpec
+- WeightSpecEntry[]
+
+WeightSpecEntry
+- uint8[5]
+- uint8[5]
+
+NSpec1
+- NSpec1Entry[]
+
+NSpec1Entry
+- uint8[8]
+
+NSpec2
+- uint16[]
+
+NSpec3
+- NSpec3Entry[]
+
+NSpec3Entry
+- uint16[7]
+
+ItemSpec
+- uint16
+- ItemSpecEntry[]
+
+ItemSpecEntry
+- uint16[13]
