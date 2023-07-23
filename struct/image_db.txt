@@ -1,0 +1,11 @@
+Root
+- raw[4]
+- *DBList
+- uint
+- padding
+
+DBList
+- DBEntry[]
+
+DBEntry
+- *str16[2]

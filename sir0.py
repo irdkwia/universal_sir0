@@ -92,7 +92,8 @@ def fint(d, element, chunk, size=0, signed=False):
 def fstr8(_, element, chunk):
     element.text = ""
     for i in range(len(chunk)):
-        if chunk[i]==0:
+        v = chunk[i]
+        if v==0:
             break
         if 0x20<=v<0x7F:
             if chr(v)=="\\":
@@ -194,7 +195,7 @@ class SIR0Cursor:
             if next_elt[0].startswith("*") or next_elt[0].split("/")[0] in DECONSTRUCT_HANDLERS:
                 confirmed_elt = next_elt[0]
             else:
-                if element is not None:
+                if element is not None and next_elt[0]!="void":
                     element.append(Element("sep", {"type": next_elt[0]}))
                 self.stack.append([self.struct_data[next_elt[0]],0,0])
         if not move:
@@ -316,7 +317,9 @@ class SIR0Deconstructor:
             current = None
             for l in self.yml_data.split("\n"):
                 l = l.strip()
-                if l.startswith("-"):
+                if l.startswith("#"):
+                    continue
+                elif l.startswith("-"):
                     l = l[1:].strip().split("[")
                     if len(l)==2:
                         br = l[1].split("]")[0].strip()

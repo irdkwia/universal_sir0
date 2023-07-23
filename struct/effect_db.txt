@@ -1,0 +1,27 @@
+# Do not use this! Incomplete!
+
+Root
+- raw[4]
+- *DBList
+- uint
+- padding
+
+DBList
+- DBEntry[]
+
+DBEntry
+- *str8
+- *str16
+- uint[3]
+- *DBEntryLight
+- uint
+- *DBEntryLight
+- uint[5]
+
+DBEntryLight
+- *str8
+- *str16
+- uint[2]
+- *str8
+- *str16
+- uint[2]
