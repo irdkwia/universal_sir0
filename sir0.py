@@ -484,16 +484,16 @@ if len(arg)-end_opt==2 or len(arg)-end_opt==3 and "-d" in lst_opts:
         endianness = 'big'
     if "-d" in lst_opts:
         if len(arg)-end_opt==3:
-            with open(arg[end_opt+2]) as file:
+            with open(arg[end_opt+2], encoding="utf-8") as file:
                 yml = file.read()
         else:
             yml = None
         with open(arg[end_opt], 'rb') as file:
             xml = SIR0Deconstructor(file.read(), yml_data=yml, endianness=endianness, ascii_comment=ascii_comment, verbose=verbose).deconstruct()
-        with open(arg[end_opt+1], 'w') as file:
+        with open(arg[end_opt+1], 'w', encoding="utf-8") as file:
             file.write(minidom.parseString(ET.tostring(xml)).toprettyxml(indent="\t"))
     else:
-        with open(arg[end_opt], 'r') as file:
+        with open(arg[end_opt], 'r', encoding="utf-8") as file:
             data = SIR0Constructor(ET.fromstring(file.read()), verbose=verbose).construct()
         with open(arg[end_opt+1], 'wb') as file:
             file.write(data)
